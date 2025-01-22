@@ -1,0 +1,98 @@
+User Authentication
+
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+db = SQLAlchemy(app)
+
+class User(db.Model):
+id = db.Column(db.Integer, primary_key=True)
+username = db.Column(db.String(80), unique=True, nullable=False)
+password = db.Column(db.String(120), nullable=False)
+
+@app.route('/register', methods=['POST'])
+def register():
+data = request.get_json()
+hashed_password = generate_password_hash(data['password'], method='sha256')
+new_user = User(username=data['username'], password=hashed_password)
+db.session.add(new_user)
+db.session.commit()
+return jsonify({'message': 'User registered successfully!'})
+
+@app.route('/login', methods=['POST'])
+def login():
+data = request.get_json()
+user = User.query.filter_by(username=data['username']).first()
+if user and check_password_hash(user.password, data['password']):
+return jsonify({'message': 'Login successful!'})
+return jsonify({'message': 'Invalid credentials!'}), 401
+
+if __name__ == '__main__':
+db.create_all()
+app.run(debug=True)
+
+
+Recommendation System
+
+
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import linear_kernel
+
+# Sample product data
+data = {'product_id': [1, 2, 3],
+'description': ['vintage camera', 'gothic jewelry', 'eco-friendly notebook']}
+products = pd.DataFrame(data)
+
+# Create a TF-IDF Vectorizer
+tfidf = TfidfVectorizer(stop_words='english')
+tfidf_matrix = tfidf.fit_transform(products['description'])
+
+# Compute the cosine similarity matrix
+cosine_sim = linear_kernel(tfidf_matrix, tfidf_matrix)
+
+def recommend_products(product_id, num_recommendations=2):
+idx = products[products['product_id'] == product_id].index[0]
+sim_scores = list(enumerate(cosine_sim[idx]))
+sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
+sim_scores = sim_scores[1:num_recommendations + 1]
+product_indices = [i[0] for i in sim_scores]
+return products.iloc[product_indices]
+
+# Example usage
+recommendations = recommend_products(1)
+print(recommendations)
+
+
+Frontend
+
+
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+
+const ProductsList = () => {
+const [products, setProducts] = useState([]);
+
+useEffect(() => {
+axios.get('/api/products') // This endpoint needs to be created
+.then(response => {
+setProducts(response.data);
+})
+.catch(error => console.error('Error fetching products:', error));
+}, []);
+
+return (
+<div>
+<h1>Product Recommendations</h1>
+<ul>
+{products.map(product => (
+<li key={product.product_id}>{product.description}</li>
+))}
+</ul>
+</div>
+);
+};
+
+export default ProductsList;
+
+
+
